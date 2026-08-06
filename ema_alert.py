@@ -13,8 +13,8 @@ import requests
 SYMBOLS = [s.strip() for s in os.environ.get("SYMBOLS", "BTC-USD,EURUSD=X,AAPL,^GSPC").split(",") if s.strip()]
 INTERVAL = os.environ.get("INTERVAL", "5m")
 PERIOD = os.environ.get("PERIOD", "5d")
-TELEGRAM_TOKEN = os.environ["8812848116:AAEh9pAGXl5dK_ORC4TZ83Jc3JIAw06Y3rw"]
-TELEGRAM_CHAT_ID = os.environ["6295934596"]
+TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
+TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 STATE_FILE = "state.json"
 
 
