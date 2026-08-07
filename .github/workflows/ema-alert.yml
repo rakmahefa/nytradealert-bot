@@ -3,8 +3,8 @@ name: EMA Cross Alert
 
 on:
   schedule:
-    - cron: "*/5 * * * *"    # toutes les 5 min, aligne sur INTERVAL=5m
-  workflow_dispatch:          # permet de lancer le check manuellement depuis GitHub
+    - cron: "*/5 * * * *"   # best-effort cote GitHub ; le vrai declencheur fiable est cron-job.org
+  workflow_dispatch:         # declenche par cron-job.org toutes les 5 min
 
 jobs:
   check:
@@ -21,12 +21,12 @@ jobs:
       - name: Installer les dependances
         run: pip install -r requirements.txt
 
-      - name: Verifier le croisement EMA sur tous les symboles
+      - name: Verifier le croisement EMA (10 actifs, reglages adaptes + filtre EMA200)
         run: python ema_alert.py
         env:
-          SYMBOLS: "BTC-USD,ETH-USD,EURUSD=X,GBPUSD=X,AAPL,^GSPC"   # melange crypto / forex / actions / indices
-          INTERVAL: "5m"
-          PERIOD: "5d"
+          # Objet JSON : reglages (interval/period/ema_fast/ema_slow/ema_trend/trend_filter)
+          # par symbole. Ajoute/retire/ajuste un actif ici sans toucher au .py
+          SYMBOLS_CONFIG: '{"BTC-USD":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"ETH-USD":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"EURUSD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"GBPUSD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"USDJPY=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"AUDUSD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"USDCAD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"USDCHF=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"AAPL":{"interval":"15m","period":"60d","ema_fast":20,"ema_slow":50,"ema_trend":200,"trend_filter":true},"^GSPC":{"interval":"1h","period":"180d","ema_fast":20,"ema_slow":50,"ema_trend":200,"trend_filter":true}}'
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
