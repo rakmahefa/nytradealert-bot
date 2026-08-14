@@ -1,16 +1,15 @@
-# A placer dans le depot sous : .github/workflows/ema-alert.yml
-name: EMA Cross Alert
+name: Pro Trading Analysis Alert
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # best-effort cote GitHub ; le vrai declencheur fiable est cron-job.org
-  workflow_dispatch:         # declenche par cron-job.org toutes les 5 min
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
 
 jobs:
   check:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # necessaire pour committer state.json (evite les alertes en double)
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -18,22 +17,20 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Installer les dependances
+      - name: Installer les dépendances
         run: pip install -r requirements.txt
 
-      - name: Verifier le croisement EMA (10 actifs, reglages adaptes + filtre EMA200)
+      - name: Exécuter l'analyse de trading professionnelle
         run: python ema_alert.py
         env:
-          # Objet JSON : reglages (interval/period/ema_fast/ema_slow/ema_trend/trend_filter)
-          # par symbole. Ajoute/retire/ajuste un actif ici sans toucher au .py
-          SYMBOLS_CONFIG: '{"BTC-USD":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"ETH-USD":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"EURUSD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"GBPUSD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"USDJPY=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"AUDUSD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"USDCAD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"USDCHF=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"trend_filter":true},"AAPL":{"interval":"15m","period":"60d","ema_fast":20,"ema_slow":50,"ema_trend":200,"trend_filter":true},"^GSPC":{"interval":"1h","period":"180d","ema_fast":20,"ema_slow":50,"ema_trend":200,"trend_filter":true}}'
+          SYMBOLS_CONFIG: '{"BTC-USD":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"rsi_period":14,"min_score":60},"ETH-USD":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"rsi_period":14,"min_score":60},"EURUSD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"rsi_period":14,"min_score":60},"GBPUSD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"rsi_period":14,"min_score":60},"USDJPY=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"rsi_period":14,"min_score":60},"AUDUSD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"rsi_period":14,"min_score":60},"USDCAD=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"rsi_period":14,"min_score":60},"USDCHF=X":{"interval":"15m","period":"60d","ema_fast":9,"ema_slow":21,"ema_trend":200,"rsi_period":14,"min_score":60},"AAPL":{"interval":"15m","period":"60d","ema_fast":20,"ema_slow":50,"ema_trend":200,"rsi_period":14,"min_score":60},"^GSPC":{"interval":"1h","period":"180d","ema_fast":20,"ema_slow":50,"ema_trend":200,"rsi_period":14,"min_score":60}}'
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-      - name: Sauvegarder l'etat (anti doublons)
+      - name: Sauvegarder l'état (anti-doublons)
         run: |
-          git config user.name "ema-bot"
-          git config user.email "ema-bot@users.noreply.github.com"
+          git config user.name "nytradealert-bot"
+          git config user.email "bot@nytradealert.com"
           git add state.json
           git diff --staged --quiet || git commit -m "update state"
           git push

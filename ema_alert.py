@@ -1,140 +1,111 @@
 """
-Alerte croisement EMA (periodes/unites de temps adaptees par actif)
-+ filtre de tendance de fond (EMA200) pour reduire les faux signaux
--> notification Telegram. Gratuit et illimite, declenche par cron-job.org
-qui appelle workflow_dispatch toutes les 5 min.
+Alerte croisement EMA et analyse de marché automatisée.
+Notification Telegram envoyée via GitHub Actions ou exécutée localement.
 """
 
-import os
 import json
-from collections import defaultdict
-
-import yfinance as yf
+import os
 import requests
+from analyzer import MarketAnalyzer
+from recommender import TradeRecommender
 
-TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 STATE_FILE = "state.json"
 
-# ema_trend = EMA de fond utilisee comme filtre de tendance : une alerte haussiere
-# n'est envoyee que si le prix est deja au-dessus, une alerte baissiere seulement
-# si le prix est en dessous. Mets trend_filter a false pour desactiver ce filtre
-# sur un symbole en particulier.
 DEFAULT_CONFIG = {
-    "BTC-USD":  {"interval": "15m", "period": "60d",  "ema_fast": 9,  "ema_slow": 21, "ema_trend": 200, "trend_filter": True},
-    "ETH-USD":  {"interval": "15m", "period": "60d",  "ema_fast": 9,  "ema_slow": 21, "ema_trend": 200, "trend_filter": True},
-    "EURUSD=X": {"interval": "15m", "period": "60d",  "ema_fast": 9,  "ema_slow": 21, "ema_trend": 200, "trend_filter": True},
-    "GBPUSD=X": {"interval": "15m", "period": "60d",  "ema_fast": 9,  "ema_slow": 21, "ema_trend": 200, "trend_filter": True},
-    "USDJPY=X": {"interval": "15m", "period": "60d",  "ema_fast": 9,  "ema_slow": 21, "ema_trend": 200, "trend_filter": True},
-    "AUDUSD=X": {"interval": "15m", "period": "60d",  "ema_fast": 9,  "ema_slow": 21, "ema_trend": 200, "trend_filter": True},
-    "USDCAD=X": {"interval": "15m", "period": "60d",  "ema_fast": 9,  "ema_slow": 21, "ema_trend": 200, "trend_filter": True},
-    "USDCHF=X": {"interval": "15m", "period": "60d",  "ema_fast": 9,  "ema_slow": 21, "ema_trend": 200, "trend_filter": True},
-    "AAPL":     {"interval": "15m", "period": "60d",  "ema_fast": 20, "ema_slow": 50, "ema_trend": 200, "trend_filter": True},
-    "^GSPC":    {"interval": "1h",  "period": "180d", "ema_fast": 20, "ema_slow": 50, "ema_trend": 200, "trend_filter": True},
+    "BTC-USD":  {"interval": "15m", "period": "5d", "min_confidence": 60},
+    "ETH-USD":  {"interval": "15m", "period": "5d", "min_confidence": 60},
+    "EURUSD=X": {"interval": "15m", "period": "5d", "min_confidence": 60},
+    "GBPUSD=X": {"interval": "15m", "period": "5d", "min_confidence": 60},
+    "USDJPY=X": {"interval": "15m", "period": "5d", "min_confidence": 60},
+    "AAPL":     {"interval": "15m", "period": "5d", "min_confidence": 60},
 }
 
-SYMBOLS_CONFIG = json.loads(os.environ.get("SYMBOLS_CONFIG", json.dumps(DEFAULT_CONFIG)))
+SYMBOLS_CONFIG = json.loads(os.getenv("SYMBOLS_CONFIG", json.dumps(DEFAULT_CONFIG)))
 
 
 def send_telegram(message: str) -> None:
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("[Telegram] Token ou Chat ID non défini, affichage console :")
+        print(message)
+        return
+
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    resp = requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": message}, timeout=15)
+    resp = requests.post(
+        url,
+        data={"chat_id": TELEGRAM_CHAT_ID, "text": message},
+        timeout=15,
+    )
     resp.raise_for_status()
 
 
 def load_state() -> dict:
     if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(STATE_FILE, encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return {}
     return {}
 
 
 def save_state(state: dict) -> None:
     with open(STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(state, f)
+        json.dump(state, f, indent=2)
 
 
-def check_symbol(symbol: str, data, cfg: dict, interval: str, state: dict) -> None:
-    ema_fast, ema_slow = cfg["ema_fast"], cfg["ema_slow"]
-    ema_trend = cfg.get("ema_trend", 200)
-    use_trend_filter = cfg.get("trend_filter", True)
+def check_symbol(symbol: str, cfg: dict, state: dict) -> None:
+    interval = cfg.get("interval", "15m")
+    period = cfg.get("period", "5d")
+    min_confidence = cfg.get("min_confidence", 60)
 
-    needed = max(ema_slow, ema_trend if use_trend_filter else 0) + 1
-    if data is None or data.empty or "Close" not in data or len(data["Close"].dropna()) < needed:
-        print(f"[{symbol}] pas assez de donnees ({needed} bougies minimum), on reessaiera.")
+    try:
+        analyzer = MarketAnalyzer(symbol=symbol, interval=interval, period=period)
+        analysis = analyzer.analyze()
+    except Exception as e:
+        print(f"[{symbol}] Erreur d'analyse : {e}")
         return
 
-    close = data["Close"].dropna()
-    fast = close.ewm(span=ema_fast, adjust=False).mean()
-    slow = close.ewm(span=ema_slow, adjust=False).mean()
+    recommender = TradeRecommender(min_confidence=min_confidence)
+    recommendation = recommender.evaluate(analysis)
 
-    prev_fast, prev_slow = float(fast.iloc[-2]), float(slow.iloc[-2])
-    last_fast, last_slow = float(fast.iloc[-1]), float(slow.iloc[-1])
-    last_close = float(close.iloc[-1])
-    last_time = str(close.index[-1])
-
-    signal = None
-    if prev_fast <= prev_slow and last_fast > last_slow:
-        signal = "haussier"
-    elif prev_fast >= prev_slow and last_fast < last_slow:
-        signal = "baissier"
-
-    if signal and use_trend_filter:
-        trend = close.ewm(span=ema_trend, adjust=False).mean()
-        last_trend = float(trend.iloc[-1])
-        if signal == "haussier" and last_close < last_trend:
-            print(f"[{symbol}] croisement haussier ignore (prix sous l'EMA{ema_trend}).")
-            signal = None
-        elif signal == "baissier" and last_close > last_trend:
-            print(f"[{symbol}] croisement baissier ignore (prix au-dessus de l'EMA{ema_trend}).")
-            signal = None
+    action = recommendation["action"]
+    last_time = analysis["timestamp"]
+    signal_key = f"{action}-{last_time}"
 
     symbol_state = state.get(symbol, {})
-    signal_key = f"{signal}-{last_time}" if signal else None
 
-    if signal and symbol_state.get("last_signal") != signal_key:
-        emoji = "🟢" if signal == "haussier" else "🔴"
+    if action in ["BUY", "SELL"] and symbol_state.get("last_signal") != signal_key:
+        emoji = "🟢" if action == "BUY" else "🔴"
+        reasons_text = "\n".join([f"• {r}" for r in recommendation["reasons"]])
+        warnings_text = "\n".join([f"⚠️ {w}" for w in recommendation["warnings"]]) if recommendation["warnings"] else "Aucun"
+
         message = (
-            f"{emoji} {symbol} ({interval}, EMA{ema_fast}/{ema_slow}, filtre EMA{ema_trend})\n"
-            f"Croisement {signal}\n"
-            f"Prix: {last_close:.5f}\n"
-            f"Bougie: {last_time}"
+            f"{emoji} **ALERTE DE TRADING: {symbol}** ({interval})\n"
+            f"Action recommandée : **{action}** (Confiance: {recommendation['confidence_score']}%)\n\n"
+            f"📊 **Niveaux Clés** :\n"
+            f"Prix d'entrée: {recommendation['entry_price']}\n"
+            f"Stop Loss: {recommendation['stop_loss']}\n"
+            f"Take Profit 1: {recommendation['take_profit_1']}\n"
+            f"Take Profit 2: {recommendation['take_profit_2']}\n"
+            f"Ratio R:R: {recommendation['risk_reward_ratio']}\n\n"
+            f"💡 **Facteurs de Confluence** :\n{reasons_text}\n\n"
+            f"⚠️ **Points d'attention** :\n{warnings_text}\n"
+            f"🕒 Date/Heure : {last_time}"
         )
         send_telegram(message)
         symbol_state["last_signal"] = signal_key
         state[symbol] = symbol_state
-        print(f"[{symbol}] alerte envoyee.")
-    elif signal:
-        print(f"[{symbol}] signal deja notifie precedemment.")
+        print(f"[{symbol}] Alerte {action} envoyée avec un score de {recommendation['confidence_score']}%")
     else:
-        print(f"[{symbol}] aucun signal retenu.")
+        print(f"[{symbol}] Statut: {action} (Confiance: {recommendation['confidence_score']}%) - Aucune nouvelle alerte à déclencher.")
 
 
 def main() -> None:
     state = load_state()
-
-    groups = defaultdict(list)
     for symbol, cfg in SYMBOLS_CONFIG.items():
-        groups[(cfg["interval"], cfg["period"])].append(symbol)
-
-    for (interval, period), symbols in groups.items():
-        data = yf.download(
-            symbols,
-            period=period,
-            interval=interval,
-            progress=False,
-            auto_adjust=True,
-            group_by="ticker",
-        )
-
-        for symbol in symbols:
-            try:
-                symbol_data = data[symbol]
-            except (KeyError, TypeError):
-                print(f"[{symbol}] telechargement impossible, symbole ignore.")
-                continue
-            check_symbol(symbol, symbol_data, SYMBOLS_CONFIG[symbol], interval, state)
-
+        check_symbol(symbol, cfg, state)
     save_state(state)
 
 
