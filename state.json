@@ -1,12 +1,12 @@
 {
   "ETH-USD": {
-    "last_signal": "SELL-2026-08-16 20:45:00+00:00"
+    "last_signal": "SELL-2026-08-17 00:00:00+00:00"
   },
   "EURUSD=X": {
     "last_signal": "BUY-2026-08-17 00:00:00+01:00"
   },
   "BTC-USD": {
-    "last_signal": "SELL-2026-08-16 20:15:00+00:00"
+    "last_signal": "SELL-2026-08-17 00:00:00+00:00"
   },
   "GBPUSD=X": {
     "last_signal": "BUY-2026-08-17 00:00:00+01:00"
@@ -21,7 +21,7 @@
     "last_signal": "BUY-2026-08-14 22:00:00+01:00"
   },
   "USDCHF=X": {
-    "last_signal": "haussier-2026-08-14 09:45:00+01:00"
+    "last_signal": "SELL-2026-08-17 01:00:00+01:00"
   },
   "AAPL": {
     "last_signal": "baissier-2026-08-10 14:45:00+01:00"
