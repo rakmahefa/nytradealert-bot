@@ -1,6 +1,6 @@
 {
   "ETH-USD": {
-    "last_signal": "BUY-2026-08-28 01:00:00+00:00"
+    "last_signal": "BUY-2026-08-28 06:45:00+00:00"
   },
   "EURUSD=X": {
     "last_signal": "SELL-2026-08-28 03:00:00+01:00"
@@ -18,7 +18,7 @@
     "last_signal": "SELL-2026-08-28 07:15:00+01:00"
   },
   "AUDUSD=X": {
-    "last_signal": "BUY-2026-08-26 21:00:00+01:00"
+    "last_signal": "BUY-2026-08-28 07:45:00+01:00"
   },
   "USDCHF=X": {
     "last_signal": "SELL-2026-08-28 02:00:00+01:00"
